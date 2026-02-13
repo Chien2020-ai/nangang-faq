@@ -313,5 +313,11 @@ async function init() {
 
 init().catch((err) => {
   console.error(err);
-  $("status").textContent = "載入失敗：請檢查 Sheet 是否已發佈為公開 CSV";
+
+  const msg = (err && (err.message || String(err))) || "unknown error";
+  const hint = msg.includes("updatePagerUI")
+    ? "（看起來是分頁 UI 元素不存在或函式未定義）"
+    : "";
+
+  $("status").textContent = `載入失敗：${msg} ${hint}`.trim();
 });
