@@ -2,11 +2,8 @@
 const SHEET_CSV_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vRWEbXZ_v_wKPkTFIMCzvtYhBxgcNqTz2mkhvrKjwyNs_dP68JuaMkXMeIsC7qB6HwGJ_Fa1dcQLA7L/pub?output=csv";
 
-// ✅ Tally 表單連結（請換成你的）
+// Tally 表單連結
 const TALLY_URL = "https://tally.so/r/obMaNV";
-
-// 欄位名稱需和你的 Sheet 第一列一致：
-// question | keywords | category | answer_short | answer_steps | last_updated | source_note
 
 const $ = (id) => document.getElementById(id);
 
@@ -101,7 +98,7 @@ function todayKey() {
   return Number(`${y}${m}${d}`);
 }
 
-// ✅ NEW 條件：7 天內（含今天）
+// NEW 條件：7 天內（含今天）
 function isWithinDays(updatedKey, days) {
   if (!updatedKey) return false;
 
@@ -151,7 +148,7 @@ function toRecords(rows) {
     });
   }
 
-  // ✅ 依 last_updated 最新→最舊
+  // 依 last_updated 最新→最舊
   records.sort((a, b) => (b._updatedKey || 0) - (a._updatedKey || 0));
 
   return records;
@@ -240,7 +237,7 @@ function itemCard(item) {
   const div = document.createElement("div");
   div.className = "item";
 
-  // ✅ NEW：7天內
+  //  NEW：7天內
   const showNew = isWithinDays(item._updatedKey, 7);
   if (showNew) {
     const badge = document.createElement("div");
@@ -396,7 +393,6 @@ function updatePagerUI(totalPages) {
   };
 }
 
-// ✅ (2) 把「FAQ回報&補充」移到搜尋框上方
 function ensureTallyButtonAboveSearch() {
   const q = $("q");
   if (!q) return;
@@ -425,7 +421,7 @@ function ensureTallyButtonAboveSearch() {
 
   wrap.appendChild(a);
 
-  // 插到搜尋框所在容器的「上一行」
+  
   const searchWrap = q.parentElement;
   if (searchWrap && searchWrap.parentElement) {
     searchWrap.parentElement.insertBefore(wrap, searchWrap);
@@ -435,7 +431,7 @@ function ensureTallyButtonAboveSearch() {
   }
 }
 
-// ✅ (3) Footer 加 ©
+// 
 function ensureFooter() {
   let footer = document.getElementById("siteFooter");
   if (footer) return;
