@@ -14,6 +14,10 @@ let activeCategory = "全部";
 let currentPage = 1;
 const PAGE_SIZE = 20;
 
+function track(event, data = {}) {
+  console.log("[analytics]", event, data);
+}
+
 function parseCSV(text) {
   const rows = [];
   let row = [];
