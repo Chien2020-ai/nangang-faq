@@ -3,7 +3,7 @@ const SHEET_CSV_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vRWEbXZ_v_wKPkTFIMCzvtYhBxgcNqTz2mkhvrKjwyNs_dP68JuaMkXMeIsC7qB6HwGJ_Fa1dcQLA7L/pub?output=csv";
 
 // ✅ Tally 表單連結（請換成你的）
-const TALLY_URL = "https://tally.so/r/obMaNV";
+const TALLY_URL = "https://tally.so/r/REPLACE_ME";
 
 // 欄位名稱需和你的 Sheet 第一列一致：
 // question | keywords | category | answer_short | answer_steps | last_updated | source_note
@@ -75,7 +75,6 @@ function parseLastUpdatedToComparable(isoLike) {
   const raw = normalize(isoLike);
   if (!raw) return 0;
 
-  // 抓出數字序列
   const parts = raw
     .replaceAll("/", "-")
     .replaceAll(".", "-")
@@ -89,7 +88,6 @@ function parseLastUpdatedToComparable(isoLike) {
 
   if (!y) return 0;
 
-  // 做成可比較的整數 YYYYMMDD
   const mm = String(Math.max(1, Math.min(12, m))).padStart(2, "0");
   const dd = String(Math.max(1, Math.min(31, d))).padStart(2, "0");
   return Number(`${y}${mm}${dd}`);
@@ -101,6 +99,28 @@ function todayKey() {
   const m = String(t.getMonth() + 1).padStart(2, "0");
   const d = String(t.getDate()).padStart(2, "0");
   return Number(`${y}${m}${d}`);
+}
+
+// ✅ NEW 條件：7 天內（含今天）
+function isWithinDays(updatedKey, days) {
+  if (!updatedKey) return false;
+
+  // updatedKey: YYYYMMDD
+  const s = String(updatedKey);
+  if (s.length !== 8) return false;
+
+  const y = Number(s.slice(0, 4));
+  const m = Number(s.slice(4, 6));
+  const d = Number(s.slice(6, 8));
+
+  const updated = new Date(y, m - 1, d);
+  const now = new Date();
+  // 以「日期」計算，避免時區/時間造成誤差
+  const updatedMid = new Date(updated.getFullYear(), updated.getMonth(), updated.getDate()).getTime();
+  const nowMid = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+  const diffDays = Math.floor((nowMid - updatedMid) / (24 * 60 * 60 * 1000));
+  return diffDays >= 0 && diffDays <= days;
 }
 
 function toRecords(rows) {
@@ -131,7 +151,7 @@ function toRecords(rows) {
     });
   }
 
-  // ✅ (2) 依 last_updated 最新→最舊
+  // ✅ 依 last_updated 最新→最舊
   records.sort((a, b) => (b._updatedKey || 0) - (a._updatedKey || 0));
 
   return records;
@@ -220,9 +240,9 @@ function itemCard(item) {
   const div = document.createElement("div");
   div.className = "item";
 
-  // ✅ (3) 當日更新 NEW 標籤
-  const isNewToday = item._updatedKey && item._updatedKey === todayKey();
-  if (isNewToday) {
+  // ✅ NEW：7天內
+  const showNew = isWithinDays(item._updatedKey, 7);
+  if (showNew) {
     const badge = document.createElement("div");
     badge.textContent = "NEW";
     badge.style.cssText =
@@ -290,37 +310,6 @@ function renderTop(items) {
   for (const it of pick) top.appendChild(itemCard(it));
 }
 
-function ensureTallyLinkBelowResults(container) {
-  if (!container) return;
-
-  // 防止重複加
-  const existing = document.getElementById("tallyLinkRow");
-  if (existing) existing.remove();
-
-  const wrap = document.createElement("div");
-  wrap.id = "tallyLinkRow";
-  wrap.style.cssText =
-    "margin-top:16px;display:flex;justify-content:center;";
-
-  const a = document.createElement("a");
-  a.href = TALLY_URL;
-  a.target = "_blank";
-  a.rel = "noopener noreferrer";
-  a.textContent = "FAQ回報&補充";
-  a.className = "btn";
-  a.style.cssText =
-    "text-decoration:none;display:inline-flex;align-items:center;gap:8px;";
-
-  // 若沒換掉連結，給提醒
-  if (String(TALLY_URL || "").includes("REPLACE_ME")) {
-    a.textContent = "FAQ回報&補充（請先設定 Tally 連結）";
-    a.style.opacity = "0.75";
-  }
-
-  wrap.appendChild(a);
-  container.appendChild(wrap);
-}
-
 function renderResults(items) {
   const list = $("resultList");
   if (!list) return;
@@ -331,16 +320,10 @@ function renderResults(items) {
     empty.className = "item";
     empty.innerHTML = `<div class="q">找不到</div><div class="a">換個關鍵字試試：例如「報修 / 1999 / 外送 / 水壓 / 車位 / 窗簾」</div>`;
     list.appendChild(empty);
-
-    // ✅ (4) 搜尋結果區塊下方加 Tally 連結
-    ensureTallyLinkBelowResults(list);
     return;
   }
 
   for (const it of items) list.appendChild(itemCard(it));
-
-  // ✅ (4) 搜尋結果區塊下方加 Tally 連結
-  ensureTallyLinkBelowResults(list);
 }
 
 function getFilteredAndScored() {
@@ -349,7 +332,6 @@ function getFilteredAndScored() {
 
   let items = all;
 
-  // ✅ 保持最新→最舊（all 已排序）
   if (activeCategory !== "全部") {
     items = items.filter((x) => x.category === activeCategory);
   }
@@ -374,14 +356,11 @@ function paginate(items) {
 }
 
 function movePagerToBottom() {
-  // ✅ (1) 把分頁元件移到頁面最底下（不改 HTML 也能做）
   const pager = $("pager");
   if (!pager) return;
 
-  // 找一個你頁面上最穩的容器：resultList 存在就放它後面；不然就放 body 最後
   const list = $("resultList");
   if (list && list.parentElement) {
-    // 放在 results 區塊的父層最後
     list.parentElement.appendChild(pager);
   } else {
     document.body.appendChild(pager);
@@ -417,15 +396,78 @@ function updatePagerUI(totalPages) {
   };
 }
 
+// ✅ (2) 把「FAQ回報&補充」移到搜尋框上方
+function ensureTallyButtonAboveSearch() {
+  const q = $("q");
+  if (!q) return;
+
+  // 已存在就不重複加
+  let wrap = document.getElementById("tallyAboveSearch");
+  if (wrap) return;
+
+  wrap = document.createElement("div");
+  wrap.id = "tallyAboveSearch";
+  wrap.style.cssText =
+    "display:flex;justify-content:flex-end;align-items:center;margin:0 0 10px 0;";
+
+  const a = document.createElement("a");
+  a.href = TALLY_URL;
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
+  a.className = "btn";
+  a.textContent = "FAQ回報&補充";
+  a.style.cssText = "text-decoration:none;display:inline-flex;align-items:center;";
+
+  if (String(TALLY_URL || "").includes("REPLACE_ME")) {
+    a.textContent = "FAQ回報&補充（請先設定 Tally 連結）";
+    a.style.opacity = "0.75";
+  }
+
+  wrap.appendChild(a);
+
+  // 插到搜尋框所在容器的「上一行」
+  const searchWrap = q.parentElement;
+  if (searchWrap && searchWrap.parentElement) {
+    searchWrap.parentElement.insertBefore(wrap, searchWrap);
+  } else {
+    // fallback
+    q.insertAdjacentElement("beforebegin", wrap);
+  }
+}
+
+// ✅ (3) Footer 加 ©
+function ensureFooter() {
+  let footer = document.getElementById("siteFooter");
+  if (footer) return;
+
+  footer = document.createElement("div");
+  footer.id = "siteFooter";
+
+  const year = new Date().getFullYear();
+  footer.innerHTML = `
+    <div style="max-width:1100px;margin:0 auto;padding:18px 20px;color:#9ca3af;font-size:12px;">
+      © ${year} 南港機廠社宅 FAQ（住戶協作版）｜僅供參考，以管理中心公告為準。
+    </div>
+  `;
+
+  footer.style.cssText =
+    "margin-top:28px;border-top:1px solid rgba(148,163,184,.18);";
+
+  document.body.appendChild(footer);
+}
+
 function render() {
   const items = getFilteredAndScored();
   const { pageItems, totalPages } = paginate(items);
 
-  renderTop(items); // 如果你 HTML 拿掉 topList，這裡會跳過
+  renderTop(items);
   renderResults(pageItems);
 
+  ensureTallyButtonAboveSearch();
   movePagerToBottom();
   updatePagerUI(totalPages);
+
+  ensureFooter();
 }
 
 async function init() {
@@ -461,7 +503,6 @@ async function init() {
 
   const updated = $("updated");
   if (updated) {
-    // 顯示原字串中最大值不一定準，這裡用 _updatedKey 顯示 YYYY-MM
     if (maxUpdated) {
       const s = String(maxUpdated);
       updated.textContent = `最新更新：${s.slice(0, 4)}-${s.slice(4, 6)}`;
