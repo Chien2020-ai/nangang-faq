@@ -3,7 +3,7 @@ const SHEET_CSV_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vRWEbXZ_v_wKPkTFIMCzvtYhBxgcNqTz2mkhvrKjwyNs_dP68JuaMkXMeIsC7qB6HwGJ_Fa1dcQLA7L/pub?output=csv";
 
 // ✅ Tally 表單連結（請換成你的）
-const TALLY_URL = "https://tally.so/r/REPLACE_ME";
+const TALLY_URL = "https://tally.so/r/obMaNV";
 
 // 欄位名稱需和你的 Sheet 第一列一致：
 // question | keywords | category | answer_short | answer_steps | last_updated | source_note
