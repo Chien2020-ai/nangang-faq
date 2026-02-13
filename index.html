@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>社宅 FAQ 查詢</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="wrap">
+    <div class="title">
+      <h1>社宅 FAQ 查詢</h1>
+      <p class="sub">先搜尋再問：把群組的重複問題變成 30 秒可查的答案。</p>
+    </div>
+
+    <div class="search">
+      <input id="q" type="search" placeholder="輸入關鍵字：例如 報修 / 1999 / 外送 / 水壓 / 車位" autocomplete="off" />
+      <button id="clearBtn" type="button">清除</button>
+    </div>
+
+    <div class="meta">
+      <span id="status">載入中…</span>
+      <span class="dot">•</span>
+      <span id="updated"></span>
+    </div>
+
+    <nav class="chips" id="chips"></nav>
+  </header>
+
+  <main class="wrap">
+    <section id="top" class="panel">
+      <h2>熱門問題</h2>
+      <div id="topList" class="list"></div>
+    </section>
+
+    <section class="panel">
+      <h2>搜尋結果</h2>
+      <div id="resultList" class="list"></div>
+    </section>
+  </main>
+
+  <footer class="wrap foot">
+    <div class="small">
+      <div>資料來源：群組整理（Google Sheet）</div>
+      <div>這是公益性整理，僅供參考；以管理中心/官方公告為準。</div>
+    </div>
+  </footer>
+
+  <script src="./app.js"></script>
+</body>
+</html>
