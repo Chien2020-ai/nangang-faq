@@ -10,9 +10,9 @@ const $ = (id) => document.getElementById(id);
 let all = [];
 let activeCategory = "全部";
 
+// 分頁狀態
 let currentPage = 1;
 const PAGE_SIZE = 20;
-let currentItems = [];
 
 function parseCSV(text) {
   const rows = [];
@@ -109,7 +109,6 @@ function scoreMatch(item, q) {
     item.answer_steps
   ).toLowerCase();
 
-  // 讓中文也能用：把整段 q 當成一個 token + 再用空白切
   const raw = q.toLowerCase().trim();
   const tokens = Array.from(
     new Set([raw, ...raw.split(/\s+/).filter(Boolean)])
@@ -128,10 +127,12 @@ function scoreMatch(item, q) {
 }
 
 function buildChips(items) {
+  const chips = $("chips");
+  if (!chips) return; // ✅ 防呆：沒有 chips 區塊就略過
+
   const categories = Array.from(new Set(items.map((x) => x.category))).sort();
   const allCats = ["全部", ...categories];
 
-  const chips = $("chips");
   chips.innerHTML = "";
   for (const cat of allCats) {
     const b = document.createElement("button");
@@ -160,8 +161,13 @@ function buildGroupCopyText(item) {
 async function copyText(text) {
   try {
     await navigator.clipboard.writeText(text);
-    $("status").textContent = "已複製到剪貼簿 ✅";
-    setTimeout(() => ($("status").textContent = `已載入 ${all.length} 筆`), 1200);
+    const status = $("status");
+    if (status) {
+      status.textContent = "已複製到剪貼簿 ✅";
+      setTimeout(() => {
+        status.textContent = `已載入 ${all.length} 筆`;
+      }, 1200);
+    }
   } catch {
     alert("複製失敗，請手動複製。");
   }
@@ -212,9 +218,10 @@ function itemCard(item) {
   return div;
 }
 
-// ✅ Top 也跟著篩選/搜尋結果走（精選，不分頁）
+// 熱門（如果你已在 index.html 拿掉 topList，這裡會自動跳過不做）
 function renderTop(items) {
   const top = $("topList");
+  if (!top) return; // ✅ 防呆
   top.innerHTML = "";
 
   const pick = [...items]
@@ -228,83 +235,33 @@ function renderTop(items) {
   for (const it of pick) top.appendChild(itemCard(it));
 }
 
-function updatePagerUI(total, totalPages) {
-  const pager = $("pager");
-  const pageInfo = $("pageInfo");
-  const prev = $("prevPage");
-  const next = $("nextPage");
-
-  // pager 元素不存在就直接略過（不報錯）
-  if (!pager || !pageInfo || !prev || !next) return;
-
-  pager.style.display = total > PAGE_SIZE ? "flex" : "none";
-  pageInfo.textContent = `第 ${currentPage} / ${totalPages} 頁（共 ${total} 筆）`;
-
-  prev.disabled = currentPage <= 1;
-  next.disabled = currentPage >= totalPages;
-
-  prev.onclick = () => {
-    if (currentPage > 1) {
-      currentPage--;
-      render();
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  };
-
-  next.onclick = () => {
-    if (currentPage < totalPages) {
-      currentPage++;
-      render();
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  };
-}
-
 function renderResults(items) {
   const list = $("resultList");
+  if (!list) return; // ✅ 防呆
   list.innerHTML = "";
 
-  // 保存目前 items（供 pager 使用）
-  currentItems = items;
-
-  const total = items.length;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-
-  // 修正頁碼範圍
-  currentPage = Math.min(Math.max(1, currentPage), totalPages);
-
-  // 沒有資料
-  if (total === 0) {
+  if (items.length === 0) {
     const empty = document.createElement("div");
     empty.className = "item";
     empty.innerHTML = `<div class="q">找不到</div><div class="a">換個關鍵字試試：例如「報修 / 1999 / 外送 / 水壓 / 車位 / 窗簾」</div>`;
     list.appendChild(empty);
-    updatePagerUI(0, 1);
     return;
   }
 
-  // 取當前頁資料
-  const start = (currentPage - 1) * PAGE_SIZE;
-  const pageItems = items.slice(start, start + PAGE_SIZE);
-
-  for (const it of pageItems) list.appendChild(itemCard(it));
-
-  // 更新 pager UI
-  updatePagerUI(total, totalPages);
+  for (const it of items) list.appendChild(itemCard(it));
 }
 
 function getFilteredAndScored() {
-  const q = normalize($("q").value);
+  const qEl = $("q");
+  const q = qEl ? normalize(qEl.value) : "";
 
   let items = all;
   if (activeCategory !== "全部") {
     items = items.filter((x) => x.category === activeCategory);
   }
 
-  // q 空的時候：直接回傳該分類全部
   if (!q) return items;
 
-  // q 有內容：算分 + 只保留命中
   return items
     .map((x) => ({ x, s: scoreMatch(x, q) }))
     .filter((o) => o.s > 0)
@@ -312,38 +269,82 @@ function getFilteredAndScored() {
     .map((o) => o.x);
 }
 
+function paginate(items) {
+  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+  if (currentPage > totalPages) currentPage = 1;
+
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const pageItems = items.slice(start, start + PAGE_SIZE);
+
+  return { pageItems, totalPages };
+}
+
+function updatePagerUI(totalPages) {
+  const pager = $("pager");
+  const pageInfo = $("pageInfo");
+  const prev = $("prevPage");
+  const next = $("nextPage");
+
+  // ✅ 你還沒加分頁 UI 的話，這裡會直接略過，不會報錯
+  if (!pager || !pageInfo || !prev || !next) return;
+
+  pager.style.display = totalPages > 1 ? "flex" : "none";
+  pageInfo.textContent = `第 ${currentPage} / ${totalPages} 頁`;
+
+  prev.disabled = currentPage <= 1;
+  next.disabled = currentPage >= totalPages;
+
+  prev.onclick = () => {
+    if (currentPage <= 1) return;
+    currentPage -= 1;
+    render();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  next.onclick = () => {
+    if (currentPage >= totalPages) return;
+    currentPage += 1;
+    render();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+}
+
 function render() {
   const items = getFilteredAndScored();
+  const { pageItems, totalPages } = paginate(items);
+
+  // 熱門問題你要隱藏的話：index.html 拿掉 topList，就不會顯示
   renderTop(items);
-  renderResults(items);
+
+  // ✅ 搜尋結果做分頁（一次 20 筆）
+  renderResults(pageItems);
+  updatePagerUI(totalPages);
 }
 
 async function init() {
-  if (!SHEET_CSV_URL) {
-    $("status").textContent = "請先設定 SHEET_CSV_URL";
-    return;
-  }
-
-  $("status").textContent = "讀取中…";
+  const status = $("status");
+  if (status) status.textContent = "讀取中…";
 
   const res = await fetch(SHEET_CSV_URL);
   const text = await res.text();
   const rows = parseCSV(text);
 
   if (!rows || rows.length < 2) {
-    $("status").textContent = "載入失敗：CSV 沒有資料或格式不正確";
+    if (status) status.textContent = "載入失敗：CSV 沒有資料或格式不正確";
     return;
   }
 
   all = toRecords(rows);
 
   if (!all.length) {
-    $("status").textContent =
-      "已載入 0 筆：請檢查 Sheet 第一列欄位名稱是否為 question/keywords/category/answer_short/answer_steps/last_updated/source_note";
+    if (status) {
+      status.textContent =
+        "已載入 0 筆：請檢查 Sheet 第一列欄位名稱是否為 question/keywords/category/answer_short/answer_steps/last_updated/source_note";
+    }
     return;
   }
 
-  $("status").textContent = `已載入 ${all.length} 筆`;
+  if (status) status.textContent = `已載入 ${all.length} 筆`;
 
   const maxUpdated = all
     .map((x) => x.last_updated)
@@ -351,29 +352,35 @@ async function init() {
     .sort()
     .slice(-1)[0];
 
-  $("updated").textContent = maxUpdated ? `最新更新：${maxUpdated}` : "";
+  const updated = $("updated");
+  if (updated) updated.textContent = maxUpdated ? `最新更新：${maxUpdated}` : "";
 
   buildChips(all);
   render();
 
-  // ✅ 搜尋變動回到第 1 頁
-  $("q").addEventListener("input", () => {
-    currentPage = 1;
-    render();
-  });
+  const q = $("q");
+  if (q) {
+    q.addEventListener("input", () => {
+      currentPage = 1; // ✅ 一輸入就回到第 1 頁
+      render();
+    });
+  }
 
-  $("clearBtn").onclick = () => {
-    $("q").value = "";
-    activeCategory = "全部";
-    currentPage = 1;
-    buildChips(all);
-    render();
-  };
+  const clearBtn = $("clearBtn");
+  if (clearBtn) {
+    clearBtn.onclick = () => {
+      if (q) q.value = "";
+      activeCategory = "全部";
+      currentPage = 1;
+      buildChips(all);
+      render();
+    };
+  }
 }
 
 init().catch((err) => {
   console.error(err);
-
+  const status = $("status");
   const msg = (err && (err.message || String(err))) || "unknown error";
-  $("status").textContent = `載入失敗：${msg}`;
+  if (status) status.textContent = `載入失敗：${msg}`;
 });
