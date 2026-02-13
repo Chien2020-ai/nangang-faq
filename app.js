@@ -139,6 +139,7 @@ function buildChips(items) {
     b.textContent = cat;
     b.onclick = () => {
       activeCategory = cat;
+      currentPage = 1; // ✅ 切分類回到第 1 頁
       buildChips(all);
       render();
     };
@@ -211,7 +212,7 @@ function itemCard(item) {
   return div;
 }
 
-// ✅ 讓 Top 也跟著篩選/搜尋結果走（關鍵修正點）
+// ✅ Top 也跟著篩選/搜尋結果走（精選，不分頁）
 function renderTop(items) {
   const top = $("topList");
   top.innerHTML = "";
@@ -227,19 +228,69 @@ function renderTop(items) {
   for (const it of pick) top.appendChild(itemCard(it));
 }
 
+function updatePagerUI(total, totalPages) {
+  const pager = $("pager");
+  const pageInfo = $("pageInfo");
+  const prev = $("prevPage");
+  const next = $("nextPage");
+
+  // pager 元素不存在就直接略過（不報錯）
+  if (!pager || !pageInfo || !prev || !next) return;
+
+  pager.style.display = total > PAGE_SIZE ? "flex" : "none";
+  pageInfo.textContent = `第 ${currentPage} / ${totalPages} 頁（共 ${total} 筆）`;
+
+  prev.disabled = currentPage <= 1;
+  next.disabled = currentPage >= totalPages;
+
+  prev.onclick = () => {
+    if (currentPage > 1) {
+      currentPage--;
+      render();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  next.onclick = () => {
+    if (currentPage < totalPages) {
+      currentPage++;
+      render();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+}
+
 function renderResults(items) {
   const list = $("resultList");
   list.innerHTML = "";
 
-  if (items.length === 0) {
+  // 保存目前 items（供 pager 使用）
+  currentItems = items;
+
+  const total = items.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  // 修正頁碼範圍
+  currentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  // 沒有資料
+  if (total === 0) {
     const empty = document.createElement("div");
     empty.className = "item";
     empty.innerHTML = `<div class="q">找不到</div><div class="a">換個關鍵字試試：例如「報修 / 1999 / 外送 / 水壓 / 車位 / 窗簾」</div>`;
     list.appendChild(empty);
+    updatePagerUI(0, 1);
     return;
   }
 
-  for (const it of items) list.appendChild(itemCard(it));
+  // 取當前頁資料
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const pageItems = items.slice(start, start + PAGE_SIZE);
+
+  for (const it of pageItems) list.appendChild(itemCard(it));
+
+  // 更新 pager UI
+  updatePagerUI(total, totalPages);
 }
 
 function getFilteredAndScored() {
@@ -305,10 +356,16 @@ async function init() {
   buildChips(all);
   render();
 
-  $("q").addEventListener("input", render);
+  // ✅ 搜尋變動回到第 1 頁
+  $("q").addEventListener("input", () => {
+    currentPage = 1;
+    render();
+  });
+
   $("clearBtn").onclick = () => {
     $("q").value = "";
     activeCategory = "全部";
+    currentPage = 1;
     buildChips(all);
     render();
   };
@@ -318,9 +375,5 @@ init().catch((err) => {
   console.error(err);
 
   const msg = (err && (err.message || String(err))) || "unknown error";
-  const hint = msg.includes("updatePagerUI")
-    ? "（看起來是分頁 UI 元素不存在或函式未定義）"
-    : "";
-
-  $("status").textContent = `載入失敗：${msg} ${hint}`.trim();
+  $("status").textContent = `載入失敗：${msg}`;
 });
