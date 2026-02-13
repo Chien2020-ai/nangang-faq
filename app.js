@@ -418,8 +418,8 @@ function ensureTallyButtonAboveSearch() {
   a.textContent = "FAQ回報&補充";
   a.style.cssText = "text-decoration:none;display:inline-flex;align-items:center;";
 
-  if (String(TALLY_URL || "").includes("REPLACE_ME")) {
-    a.textContent = "FAQ回報&補充（請先設定 Tally 連結）";
+  if (String(TALLY_URL || "").includes("https://tally.so/r/obMaNV")) {
+    a.textContent = "FAQ回報&補充";
     a.style.opacity = "0.75";
   }
 
@@ -446,7 +446,7 @@ function ensureFooter() {
   const year = new Date().getFullYear();
   footer.innerHTML = `
     <div style="max-width:1100px;margin:0 auto;padding:18px 20px;color:#9ca3af;font-size:12px;">
-      © ${year} 南港機廠社宅 FAQ（住戶協作版）｜僅供參考，以管理中心公告為準。
+      © ${year} 南港機廠社宅 FAQ｜僅供參考，以管理中心公告為準。
     </div>
   `;
 
