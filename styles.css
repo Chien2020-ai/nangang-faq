@@ -97,3 +97,16 @@ body {
   font-size: 14px;
   color: #9ca3af;
 }
+
+.pager{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin:14px 0 6px;
+}
+.pageinfo{
+  font-size:12px;
+  color:#9ca3af;
+  opacity:.95;
+}
