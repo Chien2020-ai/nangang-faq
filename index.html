@@ -7,15 +7,21 @@
   <link rel="stylesheet" href="./styles.css" />
   <script defer src="./app.js"></script>
 </head>
+
 <body>
   <header class="wrap">
     <div class="title">
-      <h1>社宅 FAQ 查詢</h1>
+      <h1>南港機廠社宅 FAQ 查詢</h1>
       <p class="sub">先搜尋再問：把群組的重複問題變成 30 秒可查的答案。</p>
     </div>
 
     <div class="search">
-      <input id="q" type="search" placeholder="輸入關鍵字：例如 報修 / 1999 / 外送 / 水壓 / 車位" autocomplete="off" />
+      <input
+        id="q"
+        type="search"
+        placeholder="輸入關鍵字：例如 報修 / 1999 / 外送 / 水壓 / 車位"
+        autocomplete="off"
+      />
       <button id="clearBtn" type="button">清除</button>
     </div>
 
@@ -25,6 +31,7 @@
       <span id="updated"></span>
     </div>
 
+    <!-- 分類 chips（一定要存在、且 id 唯一） -->
     <nav class="chips" id="chips"></nav>
   </header>
 
@@ -46,6 +53,5 @@
       <div>這是公益性整理，僅供參考；以管理中心/官方公告為準。</div>
     </div>
   </footer>
-
 </body>
 </html>
