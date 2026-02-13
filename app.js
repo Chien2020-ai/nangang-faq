@@ -7,6 +7,9 @@ const SHEET_CSV_URL =
 
 const $ = (id) => document.getElementById(id);
 
+let all = [];
+let activeCategory = "全部";
+
 let currentPage = 1;
 const PAGE_SIZE = 20;
 let currentItems = [];
