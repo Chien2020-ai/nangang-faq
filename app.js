@@ -2,6 +2,9 @@
 const SHEET_CSV_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vRWEbXZ_v_wKPkTFIMCzvtYhBxgcNqTz2mkhvrKjwyNs_dP68JuaMkXMeIsC7qB6HwGJ_Fa1dcQLA7L/pub?output=csv";
 
+// ✅ Tally 表單連結（請換成你的）
+const TALLY_URL = "https://tally.so/r/obMaNV";
+
 // 欄位名稱需和你的 Sheet 第一列一致：
 // question | keywords | category | answer_short | answer_steps | last_updated | source_note
 
@@ -66,6 +69,40 @@ function escapeHtml(s) {
     .replaceAll("'", "&#039;");
 }
 
+// 允許 last_updated 多種格式：
+// 2026-02-13 / 2026.02.13 / 2026-02 / 2026.02 / 2026/02 等
+function parseLastUpdatedToComparable(isoLike) {
+  const raw = normalize(isoLike);
+  if (!raw) return 0;
+
+  // 抓出數字序列
+  const parts = raw
+    .replaceAll("/", "-")
+    .replaceAll(".", "-")
+    .split("-")
+    .map((x) => x.trim())
+    .filter(Boolean);
+
+  const y = Number(parts[0] || 0);
+  const m = Number(parts[1] || 1);
+  const d = Number(parts[2] || 1);
+
+  if (!y) return 0;
+
+  // 做成可比較的整數 YYYYMMDD
+  const mm = String(Math.max(1, Math.min(12, m))).padStart(2, "0");
+  const dd = String(Math.max(1, Math.min(31, d))).padStart(2, "0");
+  return Number(`${y}${mm}${dd}`);
+}
+
+function todayKey() {
+  const t = new Date();
+  const y = t.getFullYear();
+  const m = String(t.getMonth() + 1).padStart(2, "0");
+  const d = String(t.getDate()).padStart(2, "0");
+  return Number(`${y}${m}${d}`);
+}
+
 function toRecords(rows) {
   const header = rows[0].map((h) => normalize(h));
   const idx = (name) => header.indexOf(name);
@@ -81,16 +118,22 @@ function toRecords(rows) {
     const question = get(r, "question");
     if (!question) continue;
 
+    const last_updated = get(r, "last_updated");
     records.push({
       question,
       keywords: get(r, "keywords"),
       category: get(r, "category") || "其他",
       answer_short: get(r, "answer_short"),
       answer_steps: get(r, "answer_steps"),
-      last_updated: get(r, "last_updated"),
+      last_updated,
       source_note: get(r, "source_note"),
+      _updatedKey: parseLastUpdatedToComparable(last_updated),
     });
   }
+
+  // ✅ (2) 依 last_updated 最新→最舊
+  records.sort((a, b) => (b._updatedKey || 0) - (a._updatedKey || 0));
+
   return records;
 }
 
@@ -128,7 +171,7 @@ function scoreMatch(item, q) {
 
 function buildChips(items) {
   const chips = $("chips");
-  if (!chips) return; // ✅ 防呆：沒有 chips 區塊就略過
+  if (!chips) return;
 
   const categories = Array.from(new Set(items.map((x) => x.category))).sort();
   const allCats = ["全部", ...categories];
@@ -140,7 +183,7 @@ function buildChips(items) {
     b.textContent = cat;
     b.onclick = () => {
       activeCategory = cat;
-      currentPage = 1; // ✅ 切分類回到第 1 頁
+      currentPage = 1;
       buildChips(all);
       render();
     };
@@ -176,6 +219,19 @@ async function copyText(text) {
 function itemCard(item) {
   const div = document.createElement("div");
   div.className = "item";
+
+  // ✅ (3) 當日更新 NEW 標籤
+  const isNewToday = item._updatedKey && item._updatedKey === todayKey();
+  if (isNewToday) {
+    const badge = document.createElement("div");
+    badge.textContent = "NEW";
+    badge.style.cssText =
+      "position:absolute;top:12px;right:14px;font-size:12px;font-weight:800;" +
+      "padding:4px 8px;border-radius:999px;background:rgba(34,197,94,.18);" +
+      "color:#22c55e;border:1px solid rgba(34,197,94,.35);";
+    div.style.position = "relative";
+    div.appendChild(badge);
+  }
 
   const q = document.createElement("div");
   q.className = "q";
@@ -218,10 +274,9 @@ function itemCard(item) {
   return div;
 }
 
-// 熱門（如果你已在 index.html 拿掉 topList，這裡會自動跳過不做）
 function renderTop(items) {
   const top = $("topList");
-  if (!top) return; // ✅ 防呆
+  if (!top) return;
   top.innerHTML = "";
 
   const pick = [...items]
@@ -235,9 +290,40 @@ function renderTop(items) {
   for (const it of pick) top.appendChild(itemCard(it));
 }
 
+function ensureTallyLinkBelowResults(container) {
+  if (!container) return;
+
+  // 防止重複加
+  const existing = document.getElementById("tallyLinkRow");
+  if (existing) existing.remove();
+
+  const wrap = document.createElement("div");
+  wrap.id = "tallyLinkRow";
+  wrap.style.cssText =
+    "margin-top:16px;display:flex;justify-content:center;";
+
+  const a = document.createElement("a");
+  a.href = TALLY_URL;
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
+  a.textContent = "FAQ回報&補充";
+  a.className = "btn";
+  a.style.cssText =
+    "text-decoration:none;display:inline-flex;align-items:center;gap:8px;";
+
+  // 若沒換掉連結，給提醒
+  if (String(TALLY_URL || "").includes("REPLACE_ME")) {
+    a.textContent = "FAQ回報&補充（請先設定 Tally 連結）";
+    a.style.opacity = "0.75";
+  }
+
+  wrap.appendChild(a);
+  container.appendChild(wrap);
+}
+
 function renderResults(items) {
   const list = $("resultList");
-  if (!list) return; // ✅ 防呆
+  if (!list) return;
   list.innerHTML = "";
 
   if (items.length === 0) {
@@ -245,10 +331,16 @@ function renderResults(items) {
     empty.className = "item";
     empty.innerHTML = `<div class="q">找不到</div><div class="a">換個關鍵字試試：例如「報修 / 1999 / 外送 / 水壓 / 車位 / 窗簾」</div>`;
     list.appendChild(empty);
+
+    // ✅ (4) 搜尋結果區塊下方加 Tally 連結
+    ensureTallyLinkBelowResults(list);
     return;
   }
 
   for (const it of items) list.appendChild(itemCard(it));
+
+  // ✅ (4) 搜尋結果區塊下方加 Tally 連結
+  ensureTallyLinkBelowResults(list);
 }
 
 function getFilteredAndScored() {
@@ -256,6 +348,8 @@ function getFilteredAndScored() {
   const q = qEl ? normalize(qEl.value) : "";
 
   let items = all;
+
+  // ✅ 保持最新→最舊（all 已排序）
   if (activeCategory !== "全部") {
     items = items.filter((x) => x.category === activeCategory);
   }
@@ -279,13 +373,27 @@ function paginate(items) {
   return { pageItems, totalPages };
 }
 
+function movePagerToBottom() {
+  // ✅ (1) 把分頁元件移到頁面最底下（不改 HTML 也能做）
+  const pager = $("pager");
+  if (!pager) return;
+
+  // 找一個你頁面上最穩的容器：resultList 存在就放它後面；不然就放 body 最後
+  const list = $("resultList");
+  if (list && list.parentElement) {
+    // 放在 results 區塊的父層最後
+    list.parentElement.appendChild(pager);
+  } else {
+    document.body.appendChild(pager);
+  }
+}
+
 function updatePagerUI(totalPages) {
   const pager = $("pager");
   const pageInfo = $("pageInfo");
   const prev = $("prevPage");
   const next = $("nextPage");
 
-  // ✅ 你還沒加分頁 UI 的話，這裡會直接略過，不會報錯
   if (!pager || !pageInfo || !prev || !next) return;
 
   pager.style.display = totalPages > 1 ? "flex" : "none";
@@ -313,11 +421,10 @@ function render() {
   const items = getFilteredAndScored();
   const { pageItems, totalPages } = paginate(items);
 
-  // 熱門問題你要隱藏的話：index.html 拿掉 topList，就不會顯示
-  renderTop(items);
-
-  // ✅ 搜尋結果做分頁（一次 20 筆）
+  renderTop(items); // 如果你 HTML 拿掉 topList，這裡會跳過
   renderResults(pageItems);
+
+  movePagerToBottom();
   updatePagerUI(totalPages);
 }
 
@@ -347,13 +454,21 @@ async function init() {
   if (status) status.textContent = `已載入 ${all.length} 筆`;
 
   const maxUpdated = all
-    .map((x) => x.last_updated)
+    .map((x) => x._updatedKey)
     .filter(Boolean)
-    .sort()
+    .sort((a, b) => a - b)
     .slice(-1)[0];
 
   const updated = $("updated");
-  if (updated) updated.textContent = maxUpdated ? `最新更新：${maxUpdated}` : "";
+  if (updated) {
+    // 顯示原字串中最大值不一定準，這裡用 _updatedKey 顯示 YYYY-MM
+    if (maxUpdated) {
+      const s = String(maxUpdated);
+      updated.textContent = `最新更新：${s.slice(0, 4)}-${s.slice(4, 6)}`;
+    } else {
+      updated.textContent = "";
+    }
+  }
 
   buildChips(all);
   render();
@@ -361,7 +476,7 @@ async function init() {
   const q = $("q");
   if (q) {
     q.addEventListener("input", () => {
-      currentPage = 1; // ✅ 一輸入就回到第 1 頁
+      currentPage = 1;
       render();
     });
   }
