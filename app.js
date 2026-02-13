@@ -1,4 +1,4 @@
-// Google Sheet 發佈的 CSV 連結（你提供的）
+// Google Sheet 發佈的 CSV 連結
 const SHEET_CSV_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vRWEbXZ_v_wKPkTFIMCzvtYhBxgcNqTz2mkhvrKjwyNs_dP68JuaMkXMeIsC7qB6HwGJ_Fa1dcQLA7L/pub?output=csv";
 
@@ -11,7 +11,6 @@ let all = [];
 let activeCategory = "全部";
 
 function parseCSV(text) {
-  // 簡單 CSV parser（支援引號、逗號、換行）
   const rows = [];
   let row = [];
   let cur = "";
@@ -22,7 +21,6 @@ function parseCSV(text) {
     const next = text[i + 1];
 
     if (c === '"' && inQuotes && next === '"') {
-      // escaped quote
       cur += '"';
       i++;
       continue;
@@ -55,6 +53,15 @@ function normalize(s) {
   return String(s || "").trim();
 }
 
+function escapeHtml(s) {
+  return String(s || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
 function toRecords(rows) {
   const header = rows[0].map((h) => normalize(h));
   const idx = (name) => header.indexOf(name);
@@ -85,6 +92,7 @@ function toRecords(rows) {
 
 function scoreMatch(item, q) {
   if (!q) return 1;
+
   const hay = (
     item.question +
     " " +
@@ -97,17 +105,17 @@ function scoreMatch(item, q) {
     item.answer_steps
   ).toLowerCase();
 
-  const tokens = q
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean);
+  // 讓中文也能用：把整段 q 當成一個 token + 再用空白切
+  const raw = q.toLowerCase().trim();
+  const tokens = Array.from(
+    new Set([raw, ...raw.split(/\s+/).filter(Boolean)])
+  ).filter(Boolean);
 
   let score = 0;
   for (const t of tokens) {
     if (hay.includes(t)) score += 2;
   }
 
-  // 額外偏好：問題標題命中
   const qhay = item.question.toLowerCase();
   for (const t of tokens) {
     if (qhay.includes(t)) score += 2;
@@ -165,8 +173,8 @@ function itemCard(item) {
   const meta = document.createElement("div");
   meta.className = "meta2";
   meta.innerHTML = `
-    <span class="tag">${item.category || "其他"}</span>
-    ${item.last_updated ? `<span>更新：${item.last_updated}</span>` : ""}
+    <span class="tag">${escapeHtml(item.category || "其他")}</span>
+    ${item.last_updated ? `<span>更新：${escapeHtml(item.last_updated)}</span>` : ""}
   `;
 
   const a = document.createElement("div");
@@ -177,9 +185,7 @@ function itemCard(item) {
     ? `<div style="margin-top:8px;color:#cbd5e1">📌 ${escapeHtml(item.answer_steps)}</div>`
     : "";
   const src = item.source_note
-    ? `<div style="margin-top:8px;color:#9ca3af;font-size:12px">來源：${escapeHtml(
-        item.source_note
-      )}</div>`
+    ? `<div style="margin-top:8px;color:#9ca3af;font-size:12px">來源：${escapeHtml(item.source_note)}</div>`
     : "";
 
   a.innerHTML = `${short}${steps}${src}`;
@@ -201,11 +207,11 @@ function itemCard(item) {
   return div;
 }
 
+// ✅ 讓 Top 也跟著篩選/搜尋結果走（關鍵修正點）
 function renderTop(items) {
   const top = $("topList");
   top.innerHTML = "";
 
-  // heuristic：較完整的排前面（keywords + steps 越多越可能是「可用答案」）
   const pick = [...items]
     .sort(
       (a, b) =>
@@ -220,6 +226,7 @@ function renderTop(items) {
 function renderResults(items) {
   const list = $("resultList");
   list.innerHTML = "";
+
   if (items.length === 0) {
     const empty = document.createElement("div");
     empty.className = "item";
@@ -227,10 +234,11 @@ function renderResults(items) {
     list.appendChild(empty);
     return;
   }
+
   for (const it of items) list.appendChild(itemCard(it));
 }
 
-function render() {
+function getFilteredAndScored() {
   const q = normalize($("q").value);
 
   let items = all;
@@ -238,23 +246,21 @@ function render() {
     items = items.filter((x) => x.category === activeCategory);
   }
 
-  const scored = items
+  // q 空的時候：直接回傳該分類全部
+  if (!q) return items;
+
+  // q 有內容：算分 + 只保留命中
+  return items
     .map((x) => ({ x, s: scoreMatch(x, q) }))
-    .filter((o) => (q ? o.s > 0 : true))
+    .filter((o) => o.s > 0)
     .sort((a, b) => b.s - a.s)
     .map((o) => o.x);
-
-  renderTop(all);
-  renderResults(scored);
 }
 
-function escapeHtml(s) {
-  return String(s || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+function render() {
+  const items = getFilteredAndScored();
+  renderTop(items);
+  renderResults(items);
 }
 
 async function init() {
